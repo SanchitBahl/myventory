@@ -1,28 +1,35 @@
 // api.js
-// A simple helper that attaches the Clerk JWT to every API request.
-// Usage: import { apiGet, apiPost, apiPatch, apiDelete } from './api'
-
 const API_URL = import.meta.env.VITE_API_URL
 
 async function request(method, path, body, getToken) {
   const token = await getToken()
-  const res = await fetch(`${API_URL}/api${path}`, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  })
+  const url = `${API_URL}/api${path}`
+  
+  console.log(`${method} ${url}`)
 
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: 'Unknown error' }))
-    throw new Error(error.detail || 'Request failed')
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    })
+
+    console.log(`Response status: ${res.status}`)
+
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ detail: 'Unknown error' }))
+      throw new Error(error.detail || 'Request failed')
+    }
+
+    if (res.status === 204) return null
+    return res.json()
+  } catch (e) {
+    console.error(`Request failed: ${e.message}`, { method, url, body })
+    throw e
   }
-
-  // 204 No Content responses have no body
-  if (res.status === 204) return null
-  return res.json()
 }
 
 export const apiGet    = (path, getToken)        => request('GET',    path, null, getToken)
