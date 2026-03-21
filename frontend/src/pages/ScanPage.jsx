@@ -16,6 +16,7 @@ export default function ScanPage() {
   const [step, setStep] = useState(STEPS.SCANNING)
   const [product, setProduct] = useState(null)
   const [source, setSource] = useState(null)
+  const [editedName, setEditedName] = useState('')
   const [expiresAt, setExpiresAt] = useState('')
   const [notes, setNotes] = useState('')
   const [manualName, setManualName] = useState('')
@@ -27,11 +28,9 @@ export default function ScanPage() {
     const reader = new BrowserMultiFormatReader()
     let stopped = false
 
-    // Small delay to ensure the video element is mounted in the DOM
     const timer = setTimeout(async () => {
       try {
         const devices = await BrowserMultiFormatReader.listVideoInputDevices()
-        // Prefer rear camera on mobile
         const device = devices.find(d => d.label.toLowerCase().includes('back'))
           ?? devices.find(d => d.label.toLowerCase().includes('rear'))
           ?? devices[0]
@@ -52,6 +51,8 @@ export default function ScanPage() {
               setSource(data.source)
               if (data.found) {
                 setProduct(data.product)
+                // Pre-fill editedName so user can change it if it's "Unknown"
+                setEditedName(data.product.name === 'Unknown' ? '' : data.product.name)
                 setStep(STEPS.CONFIRM)
               } else {
                 setProduct({ barcode })
@@ -81,10 +82,11 @@ export default function ScanPage() {
     setError(null)
     try {
       let productId = product.id
+      const nameToUse = editedName.trim() || product.name
 
       if (source !== 'cache') {
         const created = await apiPost('/products', {
-          name: source === 'not_found' ? manualName : product.name,
+          name: nameToUse,
           barcode: product.barcode || null,
           category: product.category || null,
         }, getToken)
@@ -140,23 +142,44 @@ export default function ScanPage() {
             <p className="text-xs text-gray-400 mb-1">
               {source === 'cache' ? 'Already in your inventory' : 'Found on Open Food Facts'}
             </p>
-            <p className="font-semibold text-lg">{product.name}</p>
             {product.category && <p className="text-sm text-gray-400 mt-1">{product.category}</p>}
           </div>
 
+          <label className="text-sm text-gray-400 mb-1">
+            Product name {product.name === 'Unknown' && <span className="text-amber-400">— not recognised, please enter manually</span>}
+          </label>
+          <input
+            type="text"
+            value={editedName}
+            onChange={e => setEditedName(e.target.value)}
+            placeholder={product.name === 'Unknown' ? 'Enter product name' : product.name}
+            className="bg-gray-800 rounded-lg px-4 py-2 mb-4 text-white w-full placeholder-gray-500"
+          />
+
           <label className="text-sm text-gray-400 mb-1">Expiry date (optional)</label>
-          <input type="date" value={expiresAt} onChange={e => setExpiresAt(e.target.value)}
-            className="bg-gray-800 rounded-lg px-4 py-2 mb-4 text-white w-full" />
+          <input
+            type="date"
+            value={expiresAt}
+            onChange={e => setExpiresAt(e.target.value)}
+            className="bg-gray-800 rounded-lg px-4 py-2 mb-4 text-white w-full"
+          />
 
           <label className="text-sm text-gray-400 mb-1">Notes (optional)</label>
-          <input type="text" value={notes} onChange={e => setNotes(e.target.value)}
+          <input
+            type="text"
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
             placeholder="e.g. opened, freezer"
-            className="bg-gray-800 rounded-lg px-4 py-2 mb-6 text-white w-full placeholder-gray-600" />
+            className="bg-gray-800 rounded-lg px-4 py-2 mb-6 text-white w-full placeholder-gray-600"
+          />
 
           {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
 
-          <button onClick={handleAdd} disabled={step === STEPS.ADDING}
-            className="bg-white text-gray-900 font-medium py-3 rounded-xl hover:bg-gray-100 transition disabled:opacity-50">
+          <button
+            onClick={handleAdd}
+            disabled={step === STEPS.ADDING || (product.name === 'Unknown' && !editedName.trim())}
+            className="bg-white text-gray-900 font-medium py-3 rounded-xl hover:bg-gray-100 transition disabled:opacity-50"
+          >
             {step === STEPS.ADDING ? 'Adding...' : 'Add to inventory'}
           </button>
         </div>
@@ -168,23 +191,38 @@ export default function ScanPage() {
           <p className="text-gray-400 text-sm mb-6">Barcode not recognised — enter the product name manually.</p>
 
           <label className="text-sm text-gray-400 mb-1">Product name</label>
-          <input type="text" value={manualName} onChange={e => setManualName(e.target.value)}
+          <input
+            type="text"
+            value={manualName}
+            onChange={e => setManualName(e.target.value)}
             placeholder="e.g. Whole Milk"
-            className="bg-gray-800 rounded-lg px-4 py-2 mb-4 text-white w-full placeholder-gray-600" />
+            className="bg-gray-800 rounded-lg px-4 py-2 mb-4 text-white w-full placeholder-gray-600"
+          />
 
           <label className="text-sm text-gray-400 mb-1">Expiry date (optional)</label>
-          <input type="date" value={expiresAt} onChange={e => setExpiresAt(e.target.value)}
-            className="bg-gray-800 rounded-lg px-4 py-2 mb-4 text-white w-full" />
+          <input
+            type="date"
+            value={expiresAt}
+            onChange={e => setExpiresAt(e.target.value)}
+            className="bg-gray-800 rounded-lg px-4 py-2 mb-4 text-white w-full"
+          />
 
           <label className="text-sm text-gray-400 mb-1">Notes (optional)</label>
-          <input type="text" value={notes} onChange={e => setNotes(e.target.value)}
+          <input
+            type="text"
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
             placeholder="e.g. opened, freezer"
-            className="bg-gray-800 rounded-lg px-4 py-2 mb-6 text-white w-full placeholder-gray-600" />
+            className="bg-gray-800 rounded-lg px-4 py-2 mb-6 text-white w-full placeholder-gray-600"
+          />
 
           {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
 
-          <button onClick={handleAdd} disabled={!manualName.trim()}
-            className="bg-white text-gray-900 font-medium py-3 rounded-xl hover:bg-gray-100 transition disabled:opacity-50">
+          <button
+            onClick={handleAdd}
+            disabled={!manualName.trim()}
+            className="bg-white text-gray-900 font-medium py-3 rounded-xl hover:bg-gray-100 transition disabled:opacity-50"
+          >
             Add to inventory
           </button>
         </div>
