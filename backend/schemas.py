@@ -70,7 +70,7 @@ class ProductOut(BaseModel):
     barcode: Optional[str]
     name: str
     category: Optional[str]
-    unit_count: int                 # computed — number of inventory items for this product
+    unit_count: int = 0              # computed — number of inventory items for this product
     created_at: datetime
 
     model_config = {"from_attributes": True}
