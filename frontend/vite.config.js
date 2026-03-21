@@ -7,4 +7,9 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  preview: {
+    host: '0.0.0.0',
+    port: 4173,
+    allowedHosts: ['myventory-production-1429.up.railway.app'],
+  },
 })
