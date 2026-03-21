@@ -3,3 +3,4 @@ backend/.env
 backend/__pycache__/
 backend/*.pyc
 backend/*.db
+frontend/.env
