@@ -11,13 +11,27 @@ import InventoryPage from './pages/InventoryPage'
 import ScanPage from './pages/ScanPage'
 
 function SyncUser() {
-  // Calls /api/auth/sync on first load to create the household if needed
   const { getToken, isSignedIn } = useAuth()
 
   useEffect(() => {
-    if (isSignedIn) {
-      apiPost('/auth/sync', null, getToken).catch(console.error)
+    if (!isSignedIn) return
+
+    async function sync() {
+      try {
+        await apiPost('/auth/sync', null, getToken)
+      } catch (e) {
+        // Retry once after 1 second in case of first-login race condition
+        setTimeout(async () => {
+          try {
+            await apiPost('/auth/sync', null, getToken)
+          } catch (e2) {
+            console.error('Auth sync failed:', e2.message)
+          }
+        }, 1000)
+      }
     }
+
+    sync()
   }, [isSignedIn])
 
   return null

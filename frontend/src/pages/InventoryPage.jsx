@@ -25,15 +25,20 @@ export default function InventoryPage() {
   const [error, setError] = useState(null)
 
   async function load() {
-    try {
-      const data = await apiGet('/inventory', getToken)
-      setGroups(data)
-    } catch (e) {
+  try {
+    const data = await apiGet('/inventory', getToken)
+    setGroups(data)
+  } catch (e) {
+    if (e.message.includes('not found') || e.message.includes('sync')) {
+      // New user — wait and reload once
+      setTimeout(() => window.location.reload(), 1500)
+    } else {
       setError(e.message)
-    } finally {
-      setLoading(false)
     }
+  } finally {
+    setLoading(false)
   }
+}
 
   useEffect(() => { load() }, [])
 
@@ -65,7 +70,7 @@ export default function InventoryPage() {
       {/* Content */}
       <div className="max-w-xl mx-auto px-4 py-6">
         {loading && <p className="text-gray-500 text-sm">Loading...</p>}
-        {error && <p className="text-red-500 text-sm">{error}</p>}
+        {error && !error.includes('sync') && <p className="text-red-500 text-sm">{error}</p>}
         {!loading && groups.length === 0 && (
           <div className="text-center py-20 text-gray-400">
             <p className="text-4xl mb-3">📦</p>
