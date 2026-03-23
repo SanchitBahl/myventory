@@ -1,6 +1,4 @@
 # routes.py
-# All API endpoints in one place.
-
 import os
 from datetime import date, timedelta
 
@@ -12,22 +10,13 @@ from sqlalchemy.orm import Session
 
 from auth import get_current_user
 from database import get_db
-from models import Household, InventoryItem, Product, User
+from models import Household, InventoryItem, Product, ToBuyItem, User
 from schemas import (
-    AuthSyncOut,
-    BarcodeOut,
-    BarcodeProductOut,
-    HouseholdOut,
-    HouseholdUpdate,
-    InventoryGroupOut,
-    InventoryItemCreate,
-    InventoryItemOut,
-    InventoryItemUpdate,
-    ProductCreate,
-    ProductDetailOut,
-    ProductOut,
-    ProductSummary,
-    ProductUpdate,
+    AuthSyncOut, BarcodeOut, BarcodeProductOut,
+    HouseholdOut, HouseholdUpdate,
+    InventoryGroupOut, InventoryItemCreate, InventoryItemOut, InventoryItemUpdate,
+    ProductCreate, ProductDetailOut, ProductOut, ProductSummary, ProductUpdate,
+    ToBuyItemCreate, ToBuyItemOut,
 )
 
 router = APIRouter()
@@ -48,7 +37,7 @@ def _get_jwks() -> dict:
     return _jwks_cache
 
 
-# ── Auth ─────────────────────────────────────────────────────────────────────
+# ── Auth ──────────────────────────────────────────────────────────────────────
 
 @router.post("/auth/sync", response_model=AuthSyncOut)
 def auth_sync(
@@ -76,7 +65,6 @@ def auth_sync(
     household = Household(name=default_name)
     db.add(household)
     db.flush()
-
     user = User(id=clerk_user_id, email=email, household_id=household.id)
     db.add(user)
 
@@ -195,6 +183,7 @@ def update_product(product_id: int, body: ProductUpdate, current_user: User = De
 def delete_product(product_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     product = _get_product(product_id, current_user.household_id, db)
     db.query(InventoryItem).filter(InventoryItem.product_id == product.id).delete()
+    db.query(ToBuyItem).filter(ToBuyItem.product_id == product.id).delete()
     db.delete(product)
 
 
@@ -273,4 +262,71 @@ def update_item(item_id: int, body: InventoryItemUpdate, current_user: User = De
 @router.delete("/inventory/{item_id}", status_code=204)
 def delete_item(item_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     item = _get_item(item_id, current_user.household_id, db)
+    db.delete(item)
+
+
+# ── To-buy ────────────────────────────────────────────────────────────────────
+
+@router.get("/to-buy", response_model=list[ToBuyItemOut])
+def list_to_buy(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    items = db.query(ToBuyItem).filter(ToBuyItem.household_id == current_user.household_id).all()
+    return [
+        ToBuyItemOut(
+            id=i.id,
+            product_id=i.product_id,
+            product_name=i.product.name,
+            added_at=i.added_at,
+            notes=i.notes,
+        )
+        for i in items
+    ]
+
+
+@router.post("/to-buy", response_model=ToBuyItemOut, status_code=201)
+def add_to_buy(body: ToBuyItemCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    product = db.query(Product).filter(
+        Product.id == body.product_id,
+        Product.household_id == current_user.household_id,
+    ).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    # Avoid duplicates — if already on to-buy list, return existing
+    existing = db.query(ToBuyItem).filter(
+        ToBuyItem.household_id == current_user.household_id,
+        ToBuyItem.product_id == body.product_id,
+    ).first()
+    if existing:
+        return ToBuyItemOut(
+            id=existing.id,
+            product_id=existing.product_id,
+            product_name=existing.product.name,
+            added_at=existing.added_at,
+            notes=existing.notes,
+        )
+
+    item = ToBuyItem(
+        household_id=current_user.household_id,
+        product_id=body.product_id,
+        notes=body.notes,
+    )
+    db.add(item)
+    db.flush()
+    return ToBuyItemOut(
+        id=item.id,
+        product_id=item.product_id,
+        product_name=product.name,
+        added_at=item.added_at,
+        notes=item.notes,
+    )
+
+
+@router.delete("/to-buy/{item_id}", status_code=204)
+def remove_from_to_buy(item_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    item = db.query(ToBuyItem).filter(
+        ToBuyItem.id == item_id,
+        ToBuyItem.household_id == current_user.household_id,
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
     db.delete(item)

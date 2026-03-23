@@ -104,3 +104,19 @@ class ProductDetailOut(BaseModel):
     created_at: datetime
     items: list[InventoryItemOut]
     model_config = {"from_attributes": True}
+
+
+# ── To-buy items ─────────────────────────────────────────────────────────────
+
+class ToBuyItemCreate(BaseModel):
+    product_id: int
+    notes: Optional[str] = None
+
+
+class ToBuyItemOut(BaseModel):
+    id: int
+    product_id: int
+    product_name: str
+    added_at: datetime
+    notes: Optional[str]
+    model_config = {"from_attributes": True}
