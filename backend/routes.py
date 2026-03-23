@@ -106,7 +106,6 @@ def update_household(body: HouseholdUpdate, current_user: User = Depends(get_cur
 
 @router.get("/barcode/{barcode}", response_model=BarcodeOut)
 def resolve_barcode(barcode: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # 1. Check household cache first
     product = db.query(Product).filter(
         Product.household_id == current_user.household_id,
         Product.barcode == barcode,
@@ -114,9 +113,8 @@ def resolve_barcode(barcode: str, current_user: User = Depends(get_current_user)
 
     if product:
         return BarcodeOut(found=True, source="cache",
-            product=BarcodeProductOut(id=product.id, name=product.name, category=product.category, barcode=barcode))
+            product=BarcodeProductOut(id=product.id, name=product.name, barcode=barcode))
 
-    # 2. Try Open Food Facts
     try:
         response = httpx.get(OPEN_FOOD_FACTS_URL.format(barcode=barcode), headers=OFF_HEADERS, timeout=5.0)
         data = response.json()
@@ -125,7 +123,6 @@ def resolve_barcode(barcode: str, current_user: User = Depends(get_current_user)
             return BarcodeOut(found=True, source="open_food_facts",
                 product=BarcodeProductOut(
                     name=p.get("product_name") or p.get("product_name_en") or "Unknown",
-                    category=p.get("categories_tags", [None])[0],
                     barcode=barcode,
                 ))
     except httpx.RequestError:
@@ -169,7 +166,7 @@ def create_product(body: ProductCreate, current_user: User = Depends(get_current
         if existing:
             raise HTTPException(status_code=409, detail="Barcode already exists in this household")
 
-    product = Product(household_id=current_user.household_id, barcode=body.barcode, name=body.name, category=body.category)
+    product = Product(household_id=current_user.household_id, barcode=body.barcode, name=body.name)
     db.add(product)
     db.flush()
 
@@ -188,8 +185,6 @@ def update_product(product_id: int, body: ProductUpdate, current_user: User = De
     product = _get_product(product_id, current_user.household_id, db)
     if body.name is not None:
         product.name = body.name
-    if body.category is not None:
-        product.category = body.category
     count = db.query(InventoryItem).filter(InventoryItem.product_id == product.id).count()
     out = ProductOut.model_validate(product)
     out.unit_count = count

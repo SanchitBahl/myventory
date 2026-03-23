@@ -1,8 +1,6 @@
 // pages/InventoryPage.jsx
-// Main inventory view — lists all items grouped by product, sorted by expiry.
-
 import { useEffect, useState } from 'react'
-import { useAuth, useUser, UserButton } from '@clerk/clerk-react'
+import { useAuth, UserButton } from '@clerk/clerk-react'
 import { useNavigate } from 'react-router-dom'
 import { apiGet, apiDelete } from '../api'
 
@@ -18,31 +16,30 @@ function ExpiryBadge({ date }) {
 
 export default function InventoryPage() {
   const { getToken } = useAuth()
-  const { user } = useUser()
   const navigate = useNavigate()
   const [groups, setGroups] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   async function load() {
-  try {
-    const data = await apiGet('/inventory', getToken)
-    setGroups(data)
-  } catch (e) {
-    if (e.message.includes('not found') || e.message.includes('sync')) {
-      // New user — wait and reload once
-      setTimeout(() => window.location.reload(), 1500)
-    } else {
-      setError(e.message)
+    try {
+      const data = await apiGet('/inventory', getToken)
+      setGroups(data)
+    } catch (e) {
+      if (e.message.includes('not found') || e.message.includes('sync')) {
+        setTimeout(() => window.location.reload(), 1500)
+      } else {
+        setError(e.message)
+      }
+    } finally {
+      setLoading(false)
     }
-  } finally {
-    setLoading(false)
   }
-}
 
   useEffect(() => { load() }, [])
 
   async function handleDelete(itemId) {
+    if (!window.confirm('Remove this item from inventory?')) return
     try {
       await apiDelete(`/inventory/${itemId}`, getToken)
       load()
@@ -70,7 +67,7 @@ export default function InventoryPage() {
       {/* Content */}
       <div className="max-w-xl mx-auto px-4 py-6">
         {loading && <p className="text-gray-500 text-sm">Loading...</p>}
-        {error && !error.includes('sync') && <p className="text-red-500 text-sm">{error}</p>}
+        {error && <p className="text-red-500 text-sm">{error}</p>}
         {!loading && groups.length === 0 && (
           <div className="text-center py-20 text-gray-400">
             <p className="text-4xl mb-3">📦</p>
@@ -83,9 +80,6 @@ export default function InventoryPage() {
             <div key={group.product.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100">
                 <p className="font-medium text-gray-900">{group.product.name}</p>
-                {group.product.category && (
-                  <p className="text-xs text-gray-400 mt-0.5">{group.product.category}</p>
-                )}
               </div>
               <div className="divide-y divide-gray-100">
                 {group.items.map(item => (
