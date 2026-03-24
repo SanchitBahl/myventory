@@ -71,6 +71,7 @@ class InventoryItemCreate(BaseModel):
 class InventoryItemUpdate(BaseModel):
     expires_at: Optional[date] = None
     notes: Optional[str] = None
+    clear_expiry: bool = False  # set to true to explicitly clear the expiry date
 
 
 class InventoryItemOut(BaseModel):

@@ -252,7 +252,9 @@ def add_item(body: InventoryItemCreate, current_user: User = Depends(get_current
 @router.patch("/inventory/{item_id}", response_model=InventoryItemOut)
 def update_item(item_id: int, body: InventoryItemUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     item = _get_item(item_id, current_user.household_id, db)
-    if body.expires_at is not None:
+    if body.clear_expiry:
+        item.expires_at = None
+    elif body.expires_at is not None:
         item.expires_at = body.expires_at
     if body.notes is not None:
         item.notes = body.notes

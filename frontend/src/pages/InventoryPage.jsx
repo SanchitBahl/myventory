@@ -127,7 +127,10 @@ export default function InventoryPage() {
 
   async function handleSaveExpiry(newDate) {
     try {
-      await apiPatch(`/inventory/${editExpiryItem.id}`, { expires_at: newDate }, getToken)
+      const body = newDate === null
+        ? { clear_expiry: true }
+        : { expires_at: newDate }
+      await apiPatch(`/inventory/${editExpiryItem.id}`, body, getToken)
       setEditExpiryItem(null)
       load()
     } catch (e) { alert(e.message) }
