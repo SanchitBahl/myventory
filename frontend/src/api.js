@@ -4,7 +4,7 @@ const API_URL = import.meta.env.VITE_API_URL
 async function request(method, path, body, getToken) {
   const token = await getToken()
   const url = `${API_URL}/api${path}`
-  
+
   console.log(`${method} ${url}`)
 
   try {
@@ -20,8 +20,23 @@ async function request(method, path, body, getToken) {
     console.log(`Response status: ${res.status}`)
 
     if (!res.ok) {
-      const error = await res.json().catch(() => ({ detail: 'Unknown error' }))
-      throw new Error(error.detail || 'Request failed')
+      const errorBody = await res.json().catch(() => ({ detail: 'Unknown error' }))
+
+      // FastAPI validation errors return detail as an array of objects
+      // e.g. [{ loc: [...], msg: "field required", type: "..." }]
+      // We extract a readable string from whichever shape it is
+      let message
+      if (Array.isArray(errorBody.detail)) {
+        message = errorBody.detail
+          .map(e => `${e.loc?.slice(-1)[0] ?? 'field'}: ${e.msg}`)
+          .join(', ')
+      } else if (typeof errorBody.detail === 'string') {
+        message = errorBody.detail
+      } else {
+        message = JSON.stringify(errorBody.detail) || 'Request failed'
+      }
+
+      throw new Error(message)
     }
 
     if (res.status === 204) return null

@@ -78,13 +78,26 @@ export default function ScanPage() {
     setStep(STEPS.ADDING)
     setError(null)
     try {
-      let productId = product.id
-      const nameToUse = editedName.trim() || product.name
+      let productId = product?.id
+
+      // Determine the name to save based on the flow path
+      let nameToUse
+      if (source === 'not_found') {
+        nameToUse = manualName.trim()
+      } else {
+        nameToUse = editedName.trim() || product?.name || ''
+      }
+
+      if (!nameToUse) {
+        setError('Please enter a product name')
+        setStep(source === 'not_found' ? STEPS.MANUAL : STEPS.CONFIRM)
+        return
+      }
 
       if (source !== 'cache') {
         const created = await apiPost('/products', {
           name: nameToUse,
-          barcode: product.barcode || null,
+          barcode: product?.barcode || null,
         }, getToken)
         productId = created.id
       }
